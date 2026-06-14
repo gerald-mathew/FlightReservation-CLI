@@ -1,0 +1,7 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="FlightReservation-CLI.vcxproj" Id="95d14211-b2c1-4340-a1e1-ced33bf4f2b4" />
+</Solution>
