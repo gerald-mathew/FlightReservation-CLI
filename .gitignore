@@ -361,3 +361,17 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Project build output
+build/
+build-*/
+*.exe
+
+# Runtime data
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+
+# Local secrets and configuration (copy the matching *.example.txt files)
+config/*.txt
+!config/*.example.txt
