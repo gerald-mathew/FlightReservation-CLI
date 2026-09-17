@@ -78,6 +78,38 @@ if !errorlevel! neq 0 (
 	goto :try_clang
 )
 
+REM --- Prefer the cross-platform CMake build when cmake + ninja exist --------
+REM (CMake's `import std;` support needs the Ninja generator.) Dependencies
+REM come from vcpkg when VCPKG_ROOT or C:\vcpkg is present, otherwise the
+REM compiler is expected to see system/MSYS2 packages on its search path.
+set "VCPKG_TOOLCHAIN="
+if defined VCPKG_ROOT if exist "%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake" set "VCPKG_TOOLCHAIN=%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake"
+if not defined VCPKG_TOOLCHAIN if exist "C:\vcpkg\scripts\buildsystems\vcpkg.cmake" set "VCPKG_TOOLCHAIN=C:\vcpkg\scripts\buildsystems\vcpkg.cmake"
+
+where cmake >nul 2>&1
+if !errorlevel! equ 0 (
+	where ninja >nul 2>&1
+	if !errorlevel! equ 0 (
+		echo Building with CMake + Ninja...
+		if defined VCPKG_TOOLCHAIN (
+			cmake -S "%PROJECT_DIR%" -B "%BUILD_DIR%cmake" -G Ninja -DCMAKE_BUILD_TYPE=Debug -Wno-dev -DCMAKE_TOOLCHAIN_FILE="%VCPKG_TOOLCHAIN%" -DVCPKG_TARGET_TRIPLET=x64-windows-static
+		) else (
+			cmake -S "%PROJECT_DIR%" -B "%BUILD_DIR%cmake" -G Ninja -DCMAKE_BUILD_TYPE=Debug -Wno-dev
+		)
+		if !errorlevel! equ 0 (
+			cmake --build "%BUILD_DIR%cmake"
+			if !errorlevel! equ 0 if exist "%BUILD_DIR%cmake\NexoraAirways.exe" (
+				echo.
+				echo Build completed successfully ^(CMake^).
+				echo Executable path: %BUILD_DIR%cmake\NexoraAirways.exe
+				exit /b 0
+			)
+		)
+		echo.
+		echo CMake build failed. Falling back to MSBuild...
+	)
+)
+
 echo Building with MSBuild...
 msbuild "FlightReservation-CLI.vcxproj" ^
 	/p:Configuration=Debug ^

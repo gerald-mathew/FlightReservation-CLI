@@ -37,15 +37,48 @@ Nexora Airways pairs an interactive console interface with SQLite persistence, A
 
 ## Requirements
 
-- **OS:** Windows (primary). The fallback build path also targets MSYS2 on Windows.
-- **Compiler** (any one): MSVC with C++20 module support (v143/v145 toolset, Visual Studio 2022 or newer), Clang with libc++, or GCC 15+. All need `import std;`.
-- **Dependencies:** `argon2`, `curl`, `sqlite3` and `zlib`. `nlohmann/json` is header-only and vendored under `third_party/` for the Clang/GCC fallbacks.
+- **OS:** Windows, Linux or macOS. The CMake build is fully cross-platform; the legacy `build.bat` path targets Windows (MSVC, or the MSYS2/Clang fallbacks).
+- **Compiler** (any one): GCC 15+, Clang 16+ with libc++, or MSVC (v143/v145 toolset, Visual Studio 2022 or newer). All need `import std;`.
+- **Build tools:** CMake 3.28+ and **Ninja** — CMake only implements `import std;` support with the Ninja generator.
+- **Dependencies:** `argon2`, `curl`, `sqlite3` (and `zlib`). `nlohmann/json` is header-only and vendored under `third_party/`, patched for module linkage, for every platform.
 
-The MSVC build resolves dependencies through vcpkg (`x64-windows-static` triplet); the Clang/GCC fallbacks link against MSYS2 UCRT64 libraries.
+On Windows dependencies come from vcpkg (`x64-windows-static` triplet); on Linux/macOS/MSYS2 they come from the system package manager via `pkg-config`.
+
+| Platform | Install dependencies |
+| --- | --- |
+| Debian/Ubuntu | `sudo apt install cmake ninja-build pkg-config libargon2-dev libcurl4-openssl-dev libsqlite3-dev` |
+| macOS | `brew install cmake ninja argon2 curl sqlite3` |
+| Windows (vcpkg) | `vcpkg install argon2:x64-windows-static curl:x64-windows-static sqlite3:x64-windows-static zlib:x64-windows-static` |
 
 ## Build
 
-The build script tries three toolchains in order (**MSVC → Clang → GCC**) and stops at the first that succeeds. The executable is emitted as `build/NexoraAirways.exe`.
+### CMake (cross-platform, recommended)
+
+```bash
+./build/build.sh            # release
+./build/build.sh debug      # debug
+./build/build.sh --clean    # wipe the build directory first
+```
+
+This is equivalent to:
+
+```bash
+cmake --preset release
+cmake --build --preset release
+```
+
+The executable is written to `build/cmake/release/NexoraAirways` (`NexoraAirways.exe` on Windows).
+
+On Windows with MSVC + vcpkg, run from an **x64 Native Tools Command Prompt** with `VCPKG_ROOT` pointing at your vcpkg checkout:
+
+```powershell
+cmake --preset windows-msvc
+cmake --build --preset windows-msvc
+```
+
+### Legacy Windows script (`build.bat`)
+
+`build/build.bat` still works on Windows. It now tries **CMake + Ninja first** (when available), then falls back to **MSVC (MSBuild) → Clang → GCC** and stops at the first success. The legacy executable is emitted as `build/NexoraAirways.exe`.
 
 ```powershell
 cd build
@@ -98,7 +131,10 @@ To set a custom password:
 
 ## Running
 
-```powershell
+```bash
+# CMake build
+./build/cmake/release/NexoraAirways
+# Legacy Windows script
 ./build/NexoraAirways.exe
 ```
 
@@ -107,12 +143,16 @@ On first launch the app creates the `data/` directory, opens `data/flight_reserv
 ## Project structure
 
 ```text
-src/            C++20 module interfaces (*.ixx) and implementations (*.cpp)
-third_party/    Vendored nlohmann/json for the Clang/GCC fallback builds
-build/          build.bat and (after building) the NexoraAirways.exe output
-data/           flight_reservation.db, created and updated at runtime
-config/         paystack_secret.txt and super_admin.txt, created from *.example.txt
-icon/           Windows resource script and application icon
+src/              C++20 module interfaces (*.ixx) and implementations (*.cpp)
+third_party/      Vendored, module-patched nlohmann/json used on every platform
+CMakeLists.txt    Cross-platform CMake build (MSVC / GCC / Clang)
+CMakePresets.json Ninja presets for Linux, macOS and Windows MSVC + vcpkg
+build/build.sh    Cross-platform build entry point (CMake)
+build/build.bat   Windows script: CMake first, then MSVC -> Clang -> GCC
+build/            (after building) the NexoraAirways[.exe] output
+data/             flight_reservation.db, created and updated at runtime
+config/           paystack_secret.txt and super_admin.txt, created from *.example.txt
+icon/             Windows resource script and application icon
 ```
 
 ### Modules

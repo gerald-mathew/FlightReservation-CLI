@@ -367,6 +367,10 @@ build/
 build-*/
 *.exe
 
+# CMake
+CMakeUserPresets.json
+compile_commands.json
+
 # Runtime data
 data/*.db
 data/*.sqlite
