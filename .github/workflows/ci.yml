@@ -1,0 +1,114 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: Linux build (GCC 15, CMake/Ninja)
+    runs-on: ubuntu-24.04
+    container: gcc:15
+    steps:
+      - name: Install git and build dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            git ninja-build pkg-config curl ca-certificates xz-utils \
+            libargon2-dev libcurl4-openssl-dev libsqlite3-dev
+          # The distro CMake may predate GCC `import std;` support (3.31); use a
+          # known-good release from Kitware instead of relying on the image.
+          curl -fsSL -o /tmp/cmake.tar.gz \
+            https://github.com/Kitware/CMake/releases/download/v4.2.3/cmake-4.2.3-linux-x86_64.tar.gz
+          tar -xzf /tmp/cmake.tar.gz -C /opt
+          echo "/opt/cmake-4.2.3-linux-x86_64/bin" >> "$GITHUB_PATH"
+
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake --preset release -Wno-dev
+
+      - name: Build
+        run: cmake --build --preset release
+
+      - name: Upload executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: NexoraAirways-linux-x64
+          path: build/cmake/release/NexoraAirways
+          if-no-files-found: error
+
+  windows:
+    name: Windows build (MSVC, CMake/Ninja, vcpkg)
+    runs-on: windows-latest
+    env:
+      VCPKG_DEFAULT_TRIPLET: x64-windows-static
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up MSVC developer environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Install pinned CMake 4.2.3
+        shell: pwsh
+        run: |
+          # The runner's preinstalled CMake is a newer minor release whose
+          # experimental `import std` activation UUID differs from the one this
+          # project targets; pin the matching CMake so the build is deterministic
+          # (see CMAKE_EXPERIMENTAL_CXX_IMPORT_STD in CMakeLists.txt).
+          $zip = "$env:RUNNER_TEMP\cmake.zip"
+          Invoke-WebRequest -Uri "https://github.com/Kitware/CMake/releases/download/v4.2.3/cmake-4.2.3-windows-x86_64.zip" -OutFile $zip
+          Expand-Archive -Path $zip -DestinationPath "$env:RUNNER_TEMP\cmake" -Force
+          "$env:RUNNER_TEMP\cmake\cmake-4.2.3-windows-x86_64\bin" |
+            Out-File -FilePath $env:GITHUB_PATH -Append -Encoding ascii
+
+      - name: Use the standalone classic vcpkg
+        shell: pwsh
+        run: |
+          # msvc-dev-cmd points VCPKG_ROOT at Visual Studio's bundled,
+          # manifest-only vcpkg (no classic mode / ports). The standalone
+          # classic vcpkg installed on the runner lives at C:\vcpkg.
+          "VCPKG_ROOT=C:\vcpkg" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding ascii
+
+      - name: Cache vcpkg packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            C:\vcpkg\installed
+            C:\vcpkg\downloads
+          key: vcpkg-${{ runner.os }}-${{ env.VCPKG_DEFAULT_TRIPLET }}-${{ hashFiles('CMakeLists.txt') }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-${{ env.VCPKG_DEFAULT_TRIPLET }}-
+
+      - name: Install dependencies (vcpkg)
+        shell: pwsh
+        run: |
+          & "$env:VCPKG_ROOT\vcpkg.exe" install `
+            argon2:x64-windows-static `
+            curl:x64-windows-static `
+            sqlite3:x64-windows-static `
+            zlib:x64-windows-static `
+            --clean-after-build
+
+      - name: Configure
+        run: cmake --preset windows-msvc -Wno-dev
+
+      - name: Build
+        run: cmake --build --preset windows-msvc
+
+      - name: Upload executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: NexoraAirways-windows-x64
+          path: build/cmake/windows-msvc/NexoraAirways.exe
+          if-no-files-found: error
