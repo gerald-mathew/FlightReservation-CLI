@@ -178,4 +178,4 @@ icon/             Windows resource script and application icon
 
 Released under the [MIT License](LICENSE).
 
-<p align="center"><sub>Built and maintained by <a href="https://github.com/gerald-mathew">Gerald-Mathew</a></sub></p>
+<p align="center"><sub>Built and maintained by <a href="https://github.com/gerald-mathew">Mathew Gerald Chukwudera</a></sub></p>
