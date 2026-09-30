@@ -5,6 +5,10 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/gerald-mathew/FlightReservation-CLI/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/gerald-mathew/FlightReservation-CLI/actions/workflows/ci.yml/badge.svg"></a>
+</p>
+
+<p align="center">
   <strong>A command-line flight reservation system for a fictional Nigerian airline, written in C++20 named modules.</strong>
 </p>
 
